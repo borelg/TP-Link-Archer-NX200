@@ -12,6 +12,8 @@ from tplinkrouterc6u.common.dataclass import Firmware, Status, Device, IPv4Reser
 from tplinkrouterc6u.common.exception import ClientException, ClientError
 from tplinkrouterc6u.client_abstract import AbstractRouter
 from abc import abstractmethod
+import pprint
+
 
 
 class TplinkRequest:
@@ -273,6 +275,9 @@ class TplinkBaseRouter(AbstractRouter, TplinkRequest):
 
     def get_status(self) -> Status:
         data = self.request('admin/status?form=all&operation=read', 'operation=read')
+        print("==== Raw Data from 'admin/status?form=all&operation=read' ====")
+        pprint.pprint(data)
+        print("==============================================================")
 
         status = Status()
         status._wan_macaddr = EUI48(data['wan_macaddr']) if 'wan_macaddr' in data else None

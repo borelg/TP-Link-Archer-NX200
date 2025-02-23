@@ -65,6 +65,8 @@ class TPLinkXDRClient(AbstractRouter):
         return Firmware(dev_info['hw_version'], dev_info['device_model'], dev_info['sw_version'])
 
     def get_status(self) -> Status:
+        print("==== Raw Data from 'admin/status?form=all&operation=read' ====")
+
         data = self._request({
             'method': 'get',
             'hosts_info': {

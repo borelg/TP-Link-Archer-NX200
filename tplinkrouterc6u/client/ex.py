@@ -85,9 +85,10 @@ class TPLinkEXClient(TPLinkMRClientBase):
 
         return firmware
 
-    def get_status(self) -> Status:
+    def get_status(self) -> Status:       
         status = Status()
         acts = [
+            
             self.ActItem(self.ActItem.GL, 'DEV2_ADT_LAN', attrs=['MACAddress', 'IPAddress']),
             self.ActItem(self.ActItem.GL, 'DEV2_ADT_WAN',
                          attrs=['enable', 'MACAddr', 'connIPv4Address', 'connIPv4Gateway']),
@@ -95,13 +96,20 @@ class TPLinkEXClient(TPLinkMRClientBase):
             self.ActItem(self.ActItem.GL, 'DEV2_HOST_ENTRY',
                          attrs=['active', 'X_TP_LanConnType', 'physAddress', 'IPAddress', 'hostName']),
             self.ActItem(self.ActItem.GO, 'DEV2_MEM_STATUS', attrs=['total', 'free']),
-            self.ActItem(self.ActItem.GO, 'DEV2_PROC_STATUS', attrs=['CPUUsage']),
-        ]
+            self.ActItem(self.ActItem.GO, 'DEV2_PROC_STATUS', attrs=['CPUUsage']),            
+            self.ActItem(self.ActItem.GL, 'DEV2_LTE_PROF_STAT', attrs=[]), #ok
+            self.ActItem(self.ActItem.GL, 'DEV2_LTE_SERVING_CELL_INFO', attrs=[]) #ok
+            ]
+            
 
         _, values = self.req_act(acts)
 
-        if values[0].__class__ == list:
-            values[0] = values[0][0]
+        if isinstance(values[0], list):
+            if len(values[0]) > 0:
+                values[0] = values[0][0]
+            else:
+                # e.g., handle the empty list scenario
+                print("Warning: No data returned for first item in values!")
 
         status._lan_macaddr = EUI48(values[0]['MACAddress'])
         status._lan_ipv4_addr = IPv4Address(values[0]['IPAddress'])
@@ -148,11 +156,123 @@ class TPLinkEXClient(TPLinkMRClientBase):
         status.mem_usage = ((total - free) / total)
 
         status.cpu_usage = int(values[5]['CPUUsage']) / 100
+        
+        data_prof_stat = self._to_list(values[6])
+        if data_prof_stat:
+            info = data_prof_stat[0]
+            status.lte_prof_stat = {
+                'activeProfType':  info.get('activeProfType'),
+                'activeProfIndex': info.get('activeProfIndex'),
+                'spn':             info.get('spn'),
+                'ispWhich':        info.get('ispWhich'),
+                'ispCount':        info.get('ispCount'),
+                'ispMnc':          info.get('ispMnc'),
+                'ispMcc':          info.get('ispMcc'),
+                'ispName':         info.get('ispName'),
+                'usrWhich':        info.get('usrWhich'),
+                'usrCount':        info.get('usrCount'),
+                'usrMnc':          info.get('usrMnc'),
+                'usrMcc':          info.get('usrMcc'),
+                'stack':           info.get('stack'),
+            }
+        else:
+            status.lte_prof_stat = {}
+        
+        
+        
+        # DEV2_LTE_SERVING_CELL_INFO
+        # Typically returns a dict with a "data" key containing an array of cell objects
+        status.lte_serving_cells = []
+        data_lte_cells = self._to_list(values[7])  # The library might flatten "data" automatically
+        # If it's still nested, check data_lte_cells[0]['data']
+        # We'll assume the library returned a list of cell dicts directly:
+        for cell in data_lte_cells:
+            status.lte_serving_cells.append({
+                'networkType': cell.get('networkType'),
+                'cellConnectionStatus': cell.get('cellConnectionStatus'),
+                'band': cell.get('band'),
+                'cid': cell.get('cid'),
+                'PCI': cell.get('PCI'),
+                'TAC': cell.get('TAC'),
+                'upBandWidth': cell.get('upBandWidth'),
+                'downBandWidth': cell.get('downBandWidth'),
+                'upFreq': cell.get('upFreq'),
+                'downFreq': cell.get('downFreq'),
+                'signalStrength': cell.get('signalStrength'),
+                'SSRSRP': cell.get('SSRSRP'),
+                'SSRSRQ': cell.get('SSRSRQ'),
+                'SSSINR': cell.get('SSSINR'),
+                'txPowerPUCCH': cell.get('txPowerPUCCH'),
+                'upMCS': cell.get('upMCS'),
+                'downMCS': cell.get('downMCS'),
+                'ARFCN': cell.get('ARFCN'),
+                'RSRP': cell.get('RSRP'),
+                'RSRQ': cell.get('RSRQ'),
+                'SNR': cell.get('SNR'),
+                'RSSI': cell.get('RSSI'),
+                'CQI': cell.get('CQI'),
+                'RI': cell.get('RI'),
+                'downlinkModType': cell.get('downlinkModType'),
+                'uplinkModType': cell.get('uplinkModType'),
+                'stack': cell.get('stack'),
+            })
+        
 
         status.devices = list(devices.values())
         status.clients_total = status.wired_total + status.wifi_clients_total + status.guest_clients_total
 
         return status
+        
+    def get_LTEInfo(self):       
+        
+        lteInfo = Status()
+        acts = [
+            
+            
+            self.ActItem(self.ActItem.GL, 'DEV2_LTE_SERVING_CELL_INFO', attrs=[]) #ok
+            ]
+            
+
+        _, values = self.req_act(acts)        
+        
+        # DEV2_LTE_SERVING_CELL_INFO
+        # Typically returns a dict with a "data" key containing an array of cell objects
+        lteInfo.lte_serving_cells = []
+        data_lte_cells = self._to_list(values[0])  # The library might flatten "data" automatically
+        # If it's still nested, check data_lte_cells[0]['data']
+        # We'll assume the library returned a list of cell dicts directly:
+        for cell in data_lte_cells:
+            lteInfo.lte_serving_cells.append({
+                'networkType': cell.get('networkType'),
+                'cellConnectionStatus': cell.get('cellConnectionStatus'),
+                'band': cell.get('band'),
+                'cid': cell.get('cid'),
+                'PCI': cell.get('PCI'),
+                'TAC': cell.get('TAC'),
+                'upBandWidth': cell.get('upBandWidth'),
+                'downBandWidth': cell.get('downBandWidth'),
+                'upFreq': cell.get('upFreq'),
+                'downFreq': cell.get('downFreq'),
+                'signalStrength': cell.get('signalStrength'),
+                'SSRSRP': cell.get('SSRSRP'),
+                'SSRSRQ': cell.get('SSRSRQ'),
+                'SSSINR': cell.get('SSSINR'),
+                'txPowerPUCCH': cell.get('txPowerPUCCH'),
+                'upMCS': cell.get('upMCS'),
+                'downMCS': cell.get('downMCS'),
+                'ARFCN': cell.get('ARFCN'),
+                'RSRP': cell.get('RSRP'),
+                'RSRQ': cell.get('RSRQ'),
+                'SNR': cell.get('SNR'),
+                'RSSI': cell.get('RSSI'),
+                'CQI': cell.get('CQI'),
+                'RI': cell.get('RI'),
+                'downlinkModType': cell.get('downlinkModType'),
+                'uplinkModType': cell.get('uplinkModType'),
+                'stack': cell.get('stack'),
+            })
+
+        return lteInfo
 
     def get_ipv4_reservations(self) -> [IPv4Reservation]:
         acts = [
@@ -253,6 +373,11 @@ class TPLinkEXClient(TPLinkMRClientBase):
 
             code, response = self._request(url, data_str=tp_data, encrypt=True)
             response = response.replace("\r", "").replace("\n", "").replace("\t", "")
+            
+            # >>> PRINT or LOG the raw HTTP response here <<<
+            # print("\n=== RAW RESPONSE for ActItem ===")
+            # print("ActItem:", act)
+            # print("Raw response text:", response)
 
             if code != 200:
                 error = 'TplinkRouter - EX -  Response with error; Request {} - Response {}'.format(tp_data, response)

@@ -411,6 +411,8 @@ class TPLinkMRClient(TPLinkMRClientBase):
         return firmware
 
     def get_status(self) -> Status:
+        print("==== Raw Data from 'admin/status?form=all&operation=read' ====")
+
         status = Status()
         acts = [
             self.ActItem(self.ActItem.GS, 'LAN_IP_INTF', attrs=['X_TP_MACAddress', 'IPInterfaceIPAddress']),
